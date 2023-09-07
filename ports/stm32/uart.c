@@ -82,7 +82,7 @@
 #define USART_CR3_IE_ALL (USART_CR3_IE_BASE)
 #endif
 
-#elif defined(STM32G0) || defined(STM32G4)
+#elif defined(STM32G0) || defined(STM32G4) || defined(STM32H5)
 #define USART_CR1_IE_ALL (USART_CR1_IE_BASE | USART_CR1_EOBIE | USART_CR1_RTOIE | USART_CR1_CMIE)
 #define USART_CR2_IE_ALL (USART_CR2_IE_BASE)
 #if defined(USART_CR3_TCBGTIE)
@@ -903,14 +903,14 @@ uint32_t uart_get_baudrate(pyb_uart_obj_t *self) {
     #if defined(LPUART1)
     if (self->uart_id == PYB_LPUART_1) {
         return LL_LPUART_GetBaudRate(self->uartx, uart_get_source_freq(self)
-            #if defined(STM32G0) || defined(STM32G4) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
+            #if defined(STM32G0) || defined(STM32G4) || defined(STM32H5) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
             , self->uartx->PRESC
             #endif
             );
     }
     #endif
     return LL_USART_GetBaudRate(self->uartx, uart_get_source_freq(self),
-        #if defined(STM32G0) || defined(STM32G4) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
+        #if defined(STM32G0) || defined(STM32G4) || defined(STM32H5) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
         self->uartx->PRESC,
         #endif
         LL_USART_OVERSAMPLING_16);
@@ -920,7 +920,7 @@ void uart_set_baudrate(pyb_uart_obj_t *self, uint32_t baudrate) {
     #if defined(LPUART1)
     if (self->uart_id == PYB_LPUART_1) {
         LL_LPUART_SetBaudRate(self->uartx, uart_get_source_freq(self),
-            #if defined(STM32G0) || defined(STM32G4) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
+            #if defined(STM32G0) || defined(STM32G4) || defined(STM32H5) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
             LL_LPUART_PRESCALER_DIV1,
             #endif
             baudrate);
@@ -928,7 +928,7 @@ void uart_set_baudrate(pyb_uart_obj_t *self, uint32_t baudrate) {
     }
     #endif
     LL_USART_SetBaudRate(self->uartx, uart_get_source_freq(self),
-        #if defined(STM32G0) || defined(STM32G4) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
+        #if defined(STM32G0) || defined(STM32G4) || defined(STM32H5) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
         LL_USART_PRESCALER_DIV1,
         #endif
         LL_USART_OVERSAMPLING_16, baudrate);
@@ -979,7 +979,7 @@ int uart_rx_char(pyb_uart_obj_t *self) {
         return data;
     } else {
         // no buffering
-        #if defined(STM32F0) || defined(STM32F7) || defined(STM32G0) || defined(STM32G4) || defined(STM32L0) || defined(STM32L4) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
+        #if defined(STM32F0) || defined(STM32F7) || defined(STM32G0) || defined(STM32G4) || defined(STM32H5) || defined(STM32L0) || defined(STM32L4) || defined(STM32H7) || defined(STM32WB) || defined(STM32WL)
         int data = self->uartx->RDR & self->char_mask;
         self->uartx->ICR = USART_ICR_ORECF; // clear ORE if it was set
         return data;
@@ -1052,12 +1052,20 @@ size_t uart_tx_data(pyb_uart_obj_t *self, const void *src_in, size_t num_chars, 
         // the overall timeout rather than the character timeout.
         timeout = self->timeout;
     } else {
+        #if defined(STM32G4)
+        // With using UART FIFO, the timeout should be long enough that FIFO becomes empty.
+        // Since previous data transfer may be ongoing, the timeout must be multiplied
+        // timeout_char by FIFO size + 1.
+        // STM32G4 has 8 words FIFO.
+        timeout = (8 + 1) * self->timeout_char;
+        #else
         // The timeout specified here is for waiting for the TX data register to
         // become empty (ie between chars), as well as for the final char to be
         // completely transferred.  The default value for timeout_char is long
         // enough for 1 char, but we need to double it to wait for the last char
         // to be transferred to the data register, and then to be transmitted.
         timeout = 2 * self->timeout_char;
+        #endif
     }
 
     const uint8_t *src = (const uint8_t *)src_in;
@@ -1129,7 +1137,7 @@ void uart_irq_handler(mp_uint_t uart_id) {
             uint16_t next_head = (self->read_buf_head + 1) % self->read_buf_len;
             if (next_head != self->read_buf_tail) {
                 // only read data if room in buf
-                #if defined(STM32F0) || defined(STM32F7) || defined(STM32G0) || defined(STM32G4) || defined(STM32H7) || defined(STM32L0) || defined(STM32L4) || defined(STM32WB) || defined(STM32WL)
+                #if defined(STM32F0) || defined(STM32F7) || defined(STM32G0) || defined(STM32G4) || defined(STM32H5) || defined(STM32H7) || defined(STM32L0) || defined(STM32L4) || defined(STM32WB) || defined(STM32WL)
                 int data = self->uartx->RDR; // clears UART_FLAG_RXNE
                 #else
                 self->mp_irq_flags = self->uartx->SR; // resample to get any new flags since next read of DR will clear SR

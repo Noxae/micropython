@@ -32,6 +32,7 @@
 #include "py/mperrno.h"
 #include "py/mphal.h"
 #include "extmod/modnetwork.h"
+#include "extint.h"
 #include "pendsv.h"
 #include "sdio.h"
 
@@ -92,6 +93,13 @@
 #define CYW43_PIN_WL_REG_ON             pyb_pin_WL_REG_ON
 #define CYW43_PIN_WL_HOST_WAKE          pyb_pin_WL_HOST_WAKE
 #define CYW43_PIN_WL_SDIO_1             pyb_pin_WL_SDIO_1
+#define CYW43_PIN_WL_GPIO_1             pyb_pin_WL_GPIO_1
+#define CYW43_PIN_WL_GPIO_4             pyb_pin_WL_GPIO_4
+
+#define CYW43_PIN_BT_REG_ON             pyb_pin_BT_REG_ON
+#define CYW43_PIN_BT_HOST_WAKE          pyb_pin_BT_HOST_WAKE
+#define CYW43_PIN_BT_DEV_WAKE           pyb_pin_BT_DEV_WAKE
+#define CYW43_PIN_BT_CTS                pyb_pin_BT_CTS
 
 #if MICROPY_HW_ENABLE_RF_SWITCH
 #define CYW43_PIN_WL_RFSW_VDD           pyb_pin_WL_RFSW_VDD
@@ -115,6 +123,12 @@ static inline void cyw43_delay_ms(uint32_t ms) {
     }
 }
 
+static inline void cyw43_hal_pin_config_irq_falling(cyw43_hal_pin_obj_t pin, int enable) {
+    if (enable) {
+        extint_set(pin, GPIO_MODE_IT_FALLING);
+    }
+}
+
 static inline void cyw43_sdio_init(void) {
     sdio_init(NVIC_EncodePriority(NVIC_PRIORITYGROUP_4, 14, 0));
 }
@@ -129,6 +143,10 @@ static inline void cyw43_sdio_deinit(void) {
 
 static inline void cyw43_sdio_set_irq(bool enable) {
     sdio_enable_irq(enable);
+}
+
+static inline void cyw43_sdio_enable_high_speed_4bit(void) {
+    sdio_enable_high_speed_4bit();
 }
 
 static inline int cyw43_sdio_transfer(uint32_t cmd, uint32_t arg, uint32_t *resp) {
